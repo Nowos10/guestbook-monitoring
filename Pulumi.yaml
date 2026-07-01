@@ -1,0 +1,19 @@
+name: guestbook-monitoring
+runtime: nodejs
+description: >-
+  Pulumi Kubernetes Guestbook extended with a full Prometheus + Grafana
+  monitoring stack (kube-prometheus-stack), redis-exporter sidecars,
+  ServiceMonitors, a blackbox Probe for the frontend, and a provisioned
+  Grafana dashboard.
+template:
+  config:
+    isMinikube:
+      description: >-
+        Set to true when deploying to minikube / a cluster without
+        LoadBalancer support. Frontend + Grafana are exposed via NodePort
+        instead of LoadBalancer.
+      default: false
+    grafanaAdminPassword:
+      description: Grafana admin password (output by `pulumi stack output`).
+      default: prom-operator
+      secret: true

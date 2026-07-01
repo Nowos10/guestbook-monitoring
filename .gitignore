@@ -1,0 +1,5 @@
+/bin/
+/node_modules/
+*.log
+# Local/secret stack state files (keep Pulumi.yaml, ignore per-stack config if it holds secrets you don't want committed)
+# Pulumi.*.yaml
