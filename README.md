@@ -16,16 +16,11 @@ with a complete Prometheus + Grafana monitoring stack, deployed entirely with Pu
 
 ## Architecture
 
-```
- guestbook ns                              monitoring ns
- ┌──────────────────────────────┐          ┌─────────────────────────────────────┐
- │ frontend (php-redis) x3       │◀── probe ─┤ blackbox-exporter                    │
- │   └ Service :80  ─────────────┼──────────▶│ Prometheus  ◀── ServiceMonitor/Probe │
- │ redis-leader  + redis-exporter│── scrape ─▶│ Operator                             │
- │   └ Service :6379,:9121        │          │ Grafana (LoadBalancer) ◀── dashboard │
- │ redis-replica + redis-exporter│── scrape ─▶│ kube-state-metrics / node-exporter   │
- └──────────────────────────────┘          └─────────────────────────────────────┘
-```
+![Architecture: Guestbook app with Prometheus/Grafana monitoring](diagrams/architecture.png)
+
+> Editable source: [`diagrams/architecture.drawio`](diagrams/architecture.drawio) (open at [app.diagrams.net](https://app.diagrams.net)).
+
+Prometheus scrapes the redis `redis-exporter` sidecars via a `ServiceMonitor`, and scrapes the `blackbox-exporter` — which in turn probes the frontend Service — via a `Probe`. Grafana queries Prometheus and auto-imports the dashboard from a labelled ConfigMap. Everything is provisioned by Pulumi.
 
 ### Why the frontend is monitored differently from the backend
 
