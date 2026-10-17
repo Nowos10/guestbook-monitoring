@@ -18,7 +18,8 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as pulumi from "@pulumi/pulumi";
 
-const REDIS_EXPORTER_IMAGE = "oliver006/redis_exporter:v1.62.0";
+const REDIS_IMAGE = "redis:7.2@sha256:46f15cf64fdef63e483dcda99e74e3d51c017b1175547b6bb874152ee2391aad";
+const REDIS_EXPORTER_IMAGE = "oliver006/redis_exporter:v1.62.0@sha256:c5a968ba5f30bab5e12181cceb89c4ed37cb4fe4d85490b5b66c7cfe4750b5e8";
 const REDIS_EXPORTER_PORT = 9121;
 
 export interface GuestbookArgs {
@@ -55,7 +56,7 @@ export function deployGuestbook(args: GuestbookArgs): GuestbookResult {
                     containers: [
                         {
                             name: "redis-leader",
-                            image: "redis",
+                            image: REDIS_IMAGE,
                             resources: { requests: { cpu: "100m", memory: "100Mi" } },
                             ports: [{ name: "redis", containerPort: 6379 }],
                         },
@@ -91,11 +92,10 @@ export function deployGuestbook(args: GuestbookArgs): GuestbookResult {
                     containers: [
                         {
                             name: "replica",
-                            image: "pulumi/guestbook-redis-replica",
+                            image: REDIS_IMAGE,
+                            args: ["redis-server", "--replicaof", "redis-leader", "6379"],
                             resources: { requests: { cpu: "100m", memory: "100Mi" } },
-                            // Use DNS to find the leader. Switch to "env" if your
-                            // cluster has no DNS add-on.
-                            env: [{ name: "GET_HOSTS_FROM", value: "dns" }],
+                            // Replicate from the leader Service using cluster DNS.
                             ports: [{ name: "redis", containerPort: 6379 }],
                         },
                         redisExporterSidecar(),
@@ -131,7 +131,7 @@ export function deployGuestbook(args: GuestbookArgs): GuestbookResult {
                     containers: [
                         {
                             name: "frontend",
-                            image: "pulumi/guestbook-php-redis",
+                            image: "pulumi/guestbook-php-redis@sha256:f21cbff35c0bad29d0c480f741e19919fb135d7c7941b8b5fc7240503d0a1c4f",
                             resources: { requests: { cpu: "100m", memory: "100Mi" } },
                             env: [{ name: "GET_HOSTS_FROM", value: "dns" }],
                             ports: [{ name: "http", containerPort: 80 }],
@@ -159,8 +159,7 @@ export function deployGuestbook(args: GuestbookArgs): GuestbookResult {
     const crOpts = { provider, dependsOn: [crdDependency] };
 
     // ServiceMonitor: scrape the redis-exporter `metrics` port on both services.
-    // A single ServiceMonitor matches both redis Services via the shared
-    // `monitored-by: guestbook` label we add through matchExpressions on `app`.
+    // A single ServiceMonitor matches both redis Services by their app labels.
     new k8s.apiextensions.CustomResource("redis-servicemonitor", {
         apiVersion: "monitoring.coreos.com/v1",
         kind: "ServiceMonitor",

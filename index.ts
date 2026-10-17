@@ -15,7 +15,7 @@ import { deployGuestbook } from "./guestbook";
 const config = new pulumi.Config();
 const isMinikube = config.getBoolean("isMinikube") ?? false;
 const adminUser = "admin";
-const adminPassword = config.get("grafanaAdminPassword") ?? "prom-operator";
+const adminPassword = config.getSecret("grafanaAdminPassword") ?? pulumi.secret("prom-operator");
 
 // On minikube (no cloud LoadBalancer) fall back to NodePort.
 const externalServiceType = isMinikube ? "NodePort" : "LoadBalancer";

@@ -52,11 +52,10 @@ equivalents) so Prometheus discovers our resources cluster-wide.
 
 ## Prerequisites
 
-* A running Kubernetes cluster and a working `kubectl` context
+* A running Kubernetes 1.25+ cluster and a working `kubectl` context
   (EKS/GKE/AKS for `LoadBalancer`, or minikube/kind with `isMinikube=true`).
-* [Pulumi CLI](https://www.pulumi.com/docs/install/) and Node.js 18+.
-* [Helm](https://helm.sh/docs/intro/install/) available on PATH (Pulumi's Helm
-  Release provider shells out to it).
+* [Pulumi CLI](https://www.pulumi.com/docs/install/) and Node.js 22+.
+* Helm CLI is optional for inspecting chart releases; Pulumi manages their deployment.
 
 The program uses your ambient kubeconfig (`kubectl config current-context`).
 
@@ -65,7 +64,7 @@ The program uses your ambient kubeconfig (`kubectl config current-context`).
 ## Deploy
 
 ```bash
-npm install
+npm ci
 
 # First time only — create/select a stack:
 pulumi stack init dev
@@ -160,7 +159,7 @@ provisioning sidecar — no manual import. Find it in Grafana under
 **Dashboards → Guestbook — Application Monitoring**. Panels:
 
 * Frontend: availability, HTTP status code, probe latency, pod CPU, pod memory.
-* Redis: commands/sec (request rate), connected clients, keys, memory used.
+* Redis: commands/sec (request rate), connected clients, leader key count, memory used.
 
 The dashboard JSON lives at [`dashboards/guestbook-dashboard.json`](dashboards/guestbook-dashboard.json)
 and uses a `datasource` template variable, so it binds to whatever Prometheus
@@ -168,7 +167,7 @@ datasource Grafana provisions.
 
 These panels are deliberately framed as candidate **SLIs**: `probe_success` is an
 availability SLI for the frontend, `probe_duration_seconds` is a latency SLI, and
-redis command rate / error counts describe backend health. The natural next step
+redis command rate and resource metrics describe backend health. The natural next step
 (below) is to attach **SLOs** and burn-rate alerts to them so the dashboard
 reflects what actually matters to a customer rather than raw resource counters.
 
@@ -197,7 +196,30 @@ reflects what actually matters to a customer rather than raw resource counters.
 * **Deliver via GitOps.** Pair this Pulumi-provisioned platform with a pull-based
   GitOps workflow (ArgoCD or Flux) for in-cluster app manifests, keeping every
   change declarative and version-controlled.
-* Pin the chart versions (left unpinned here so it deploys against a fresh repo;
-  the `version:` field is commented in `monitoring.ts` showing where).
+* Update the pinned chart versions and image digests after validation.
 * Put Grafana behind an Ingress + TLS instead of a raw LoadBalancer.
 * Add a horizontal pod autoscaler on the frontend driven by request-rate metrics.
+
+
+## Reproducible versions and validation
+
+* kube-prometheus-stack: **92.10.1** (chart requires Kubernetes 1.25+).
+* prometheus-blackbox-exporter: **11.20.0**.
+* Redis leader and replica use the same Redis 7.2 image digest; the replica is configured explicitly with `--replicaof redis-leader 6379`.
+* All application/exporter images are pinned by SHA-256 digest in `guestbook.ts`. Helm charts pin their bundled monitoring image defaults.
+* Commit `package-lock.json` and install with `npm ci`.
+* Grafana password is read with `getSecret()` and remains secret in Helm values and stack outputs.
+
+Run `npm test` for TypeScript compilation and Pulumi mock checks of both service modes, secret propagation, monitoring targets, image pins, replica configuration, and dashboard queries. Mocks do not contact Kubernetes or verify container health.
+
+See [VALIDATION.md](VALIDATION.md) for the remaining live deployment checks. No live deployment or dashboard screenshots are claimed by this update. Frontend probes measure synthetic availability/latency, not real user request rate; CPU/memory satisfy the resource-usage option in the assignment. Redis command rate includes exporter activity and is not an exact count of user requests. The Redis keys panel counts leader keys, not guestbook entries.
+
+For kind or another local cluster, use `isMinikube=true` to select NodePort, then use port forwarding if the node IP is not reachable:
+
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+# In another terminal:
+kubectl port-forward -n guestbook svc/frontend 8080:80
+```
+
+Grafana: http://localhost:3000; Guestbook: http://localhost:8080.

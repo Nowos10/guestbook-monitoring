@@ -47,7 +47,7 @@ export function deployMonitoring(args: MonitoringArgs): MonitoringResult {
         name: STACK_RELEASE,           // fixed name -> predictable service names
         namespace,
         chart: "kube-prometheus-stack",
-        // version: "75.x.x",          // RECOMMENDED: pin in real use. Omitted -> latest.
+        version: "92.10.1",
         repositoryOpts: { repo: PROM_HELM_REPO },
         values: {
             grafana: {
@@ -82,6 +82,7 @@ export function deployMonitoring(args: MonitoringArgs): MonitoringResult {
         name: "blackbox-exporter",
         namespace,
         chart: "prometheus-blackbox-exporter",
+        version: "11.20.0",
         repositoryOpts: { repo: PROM_HELM_REPO },
         values: {
             fullnameOverride: "blackbox-exporter",   // -> service "blackbox-exporter:9115"
@@ -89,10 +90,9 @@ export function deployMonitoring(args: MonitoringArgs): MonitoringResult {
     }, { ...opts, dependsOn: [namespaceResource] });
 
     const blackboxProberUrl = pulumi
-        .all([namespace])
+        .all([namespace, blackbox.status])
         .apply(([ns]) => `blackbox-exporter.${ns}.svc.cluster.local:9115`);
-    // Keep a dependency edge on the blackbox release.
-    blackbox.status.apply(() => undefined);
+
 
     // -------------------------------------------------------------------------
     // Grafana dashboard (stretch goal) provisioned via labeled ConfigMap

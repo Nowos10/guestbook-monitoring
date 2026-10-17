@@ -5,11 +5,18 @@
   "main": "index.ts",
   "devDependencies": {
     "@types/node": "22.13.14",
-    "typescript": "^5.0.0"
+    "typescript": "5.9.3"
   },
   "dependencies": {
     "@pulumi/kubernetes": "4.28.0",
     "@pulumi/pulumi": "3.228.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "npm run check && node tests/pulumi-mocks.cjs && node tests/pulumi-mocks.cjs --nodeport"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }
