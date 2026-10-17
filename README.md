@@ -186,20 +186,42 @@ reflects what actually matters to a customer rather than raw resource counters.
 └── tsconfig.json
 ```
 
-## Notes / things I'd do next with more time
+## Future improvements and maintenance
 
-* **Define SLOs + burn-rate alerts.** Turn the SLIs above into SLOs (e.g. 99.5%
-  frontend availability, p95 latency target) and add multi-window burn-rate
-  `PrometheusRule`s wired to Alertmanager — alerting on error budget, not noise.
-* **Add Loki for logs.** Deploy Loki + Promtail and correlate frontend/redis logs
-  with the metrics in Grafana, so an alert links straight to the relevant logs.
-* **Deliver via GitOps.** Pair this Pulumi-provisioned platform with a pull-based
-  GitOps workflow (ArgoCD or Flux) for in-cluster app manifests, keeping every
-  change declarative and version-controlled.
-* Update the pinned chart versions and image digests after validation.
-* Put Grafana behind an Ingress + TLS instead of a raw LoadBalancer.
-* Add a horizontal pod autoscaler on the frontend driven by request-rate metrics.
+These are proposed next steps beyond the submitted implementation. The SLO rules,
+logging stack, GitOps workflow, TLS ingress and request-based autoscaler are not
+implemented in this repository.
 
+* **Define SLOs + burn-rate alerts.** Establish a 99.5% frontend availability
+  objective over a defined window (for example, 30 days). Distinguish the current
+  synthetic availability SLI from real user availability. Add request counters
+  and latency histograms before defining request-based SLOs. Set a p95 latency
+  target from observed traffic and calculate latency error-budget consumption
+  from the fraction of requests exceeding a latency threshold. Add multi-window
+  burn-rate PrometheusRule alerts routed through Alertmanager, with paired
+  short/long windows, minimum traffic checks and dashboard/runbook links.
+* **Add Loki for logs.** Deploy Loki with Grafana Alloy to collect frontend and
+  Redis logs. Use consistent namespace, application and pod labels to correlate
+  logs with metrics in Grafana, and link alerts to scoped Grafana Explore views.
+  Use Alloy instead of Promtail because
+  [Promtail reached end of life on March 2, 2026](https://grafana.com/docs/alloy/latest/set-up/migrate/from-promtail/).
+* **Deliver via GitOps.** Pair the Pulumi-provisioned platform with Argo CD or
+  Flux for pull-based reconciliation of version-controlled application manifests.
+  Pulumi would manage the platform and bootstrap; the GitOps controller would
+  manage application resources. Migrate ownership explicitly so both tools do
+  not manage the same objects.
+* **Maintain pinned versions.** Chart versions, application image digests and
+  the npm dependency lockfile are already pinned. Update them through reviewed
+  changes after compilation, resource checks, live deployment and dashboard
+  validation; record tested versions and results in VALIDATION.md.
+* **Protect Grafana with Ingress + TLS.** Configure an ingress controller, DNS,
+  certificate issuance and HTTPS access, then change Grafana's Service to
+  ClusterIP. Validate certificate renewal and access controls before exposure.
+* **Add request-based frontend autoscaling.** Instrument real frontend request
+  metrics first. Expose a per-pod request-rate metric through a Prometheus adapter
+  or another Kubernetes metrics integration, then configure an HPA with measured
+  thresholds, replica bounds and stabilization windows. Load-test scaling and
+  recovery. Synthetic probe counts do not measure user traffic.
 
 ## Reproducible versions and validation
 
